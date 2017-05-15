@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.preference.PreferenceManager;
 import android.support.design.widget.Snackbar;
@@ -39,6 +40,8 @@ import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.util.Locale;
 
@@ -50,7 +53,77 @@ import de.baumann.browser.utils.Utils_UserAgent;
 import static android.content.ContentValues.TAG;
 import static android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE;
 
+import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SmbException;
+import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileInputStream;
+
+
 public class helper_webView {
+
+    private static class GetScript extends AsyncTask<Void, Integer, String> {
+        // you may separate this or combined to caller class.
+        public interface AsyncResponse {
+            void processFinish(String output,WebView view);
+        }
+
+        public AsyncResponse delegate = null;
+        public WebView view = null;
+
+        public GetScript(AsyncResponse delegate,WebView view){
+            this.delegate = delegate;
+            this.view     = view;
+        }
+
+        @Override
+        protected String doInBackground(Void... params) {
+            try{
+                jcifs.Config.registerSmbURLHandler();
+                String s_url = "smb://192.168.1.110/Public/test.txt";
+                SmbFile smbfile = new SmbFile(s_url);
+                SmbFileInputStream in;
+
+                try {
+//                                in = new SmbFileInputStream(smbfile);
+//                                byte[] b = new byte[8192];
+//                                int n;
+//                                while(( n = in.read( b )) > 0 ) {
+//                                    Log.d("lemonhall", b.toString());
+//                                }
+                    in = new SmbFileInputStream(smbfile);
+                    BufferedReader bufferedFileReader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+                    String line = null;
+                    StringBuilder f_content = new StringBuilder();
+
+                    try {
+                        while ((line = bufferedFileReader.readLine()) != null) {
+                            if (!line.trim().isEmpty()) {
+                                f_content.append(line);
+                            }
+                        }
+                        //Log.d("lemonhall", f_content.toString());
+                        return f_content.toString();
+                    } finally {
+                        bufferedFileReader.close();
+                    }
+
+                }catch (SmbException e) {
+                    Log.d("lemonhall", "new SmbFileInputStream",e);
+                    return e.toString();
+                }
+
+
+            }catch(Exception e){
+                Log.d("lemonhall", "onPageFinished()", e);
+                return e.toString();
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            delegate.processFinish(result,view);
+        }
+    }
 
     public static String getTitle (WebView webview) {
 
@@ -147,100 +220,122 @@ public class helper_webView {
 
         // crude if-else just to get the functionality in, feel free to make this more concise if you like
         if (sharedPref.getString("blockads_string", "").equals(from.getString(R.string.app_yes))) {
-        webView.setWebViewClient(new Utils_AdClient() {
+            webView.setWebViewClient(new Utils_AdClient() {
 
-            public void onPageFinished(WebView view, String url) {
-                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(from);
-                super.onPageFinished(view, url);
-                swipeRefreshLayout.setRefreshing(false);
-                urlBar.setText(webView.getTitle());
-                sharedPref.edit().putString("openURL", "").apply();
-
-                if (webView.getTitle() != null && !webView.getTitle().equals("about:blank")  && !webView.getTitle().isEmpty()) {
-
-                    DbAdapter_History db = new DbAdapter_History(from);
-                    db.open();
-                    db.deleteDouble(webView.getUrl());
-
-                    if(db.isExist(helper_main.createDateSecond())){
-                        Log.i(TAG, "Entry exists" + webView.getUrl());
-                    }else{
-                        if (helper_webView.getTitle (webView).contains("'")) {
-                            String title = helper_webView.getTitle (webView).replace("'", "");
-                            db.insert(title, webView.getUrl(), "", "", helper_main.createDateSecond());
-
-                        } else {
-                            db.insert(helper_webView.getTitle (webView), webView.getUrl(), "", "", helper_main.createDateSecond());
-                        }
-                    }
+                private void processValue(WebView view,String file_content)
+                {
+                    //handle value
+                    //Update GUI, show toast, etc..
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("alert('"+file_content+"')");
+                    view.loadUrl("javascript:" + sb.toString());
                 }
-            }
 
-            @SuppressWarnings("deprecation")
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                final Uri uri = Uri.parse(url);
-                return handleUri(uri);
-            }
+                public void onPageFinished(WebView view, String url) {
+                    SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(from);
+                    super.onPageFinished(view, url);
+                    swipeRefreshLayout.setRefreshing(false);
+                    urlBar.setText(webView.getTitle());
+                    sharedPref.edit().putString("openURL", "").apply();
 
-            @TargetApi(Build.VERSION_CODES.N)
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                final Uri uri = request.getUrl();
-                return handleUri(uri);
-            }
+                    if (webView.getTitle() != null && !webView.getTitle().equals("about:blank")  && !webView.getTitle().isEmpty()) {
 
-            private boolean handleUri(final Uri uri) {
+                        DbAdapter_History db = new DbAdapter_History(from);
+                        db.open();
+                        db.deleteDouble(webView.getUrl());
 
-                Log.i(TAG, "Uri =" + uri);
-                final String url = uri.toString();
-                // Based on some condition you need to determine if you are going to load the url
-                // in your web view itself or in a browser.
-                // You can use `host` or `scheme` or any part of the `uri` to decide.
+                        if(db.isExist(helper_main.createDateSecond())){
+                            Log.i(TAG, "Entry exists" + webView.getUrl());
+                        }else{
+                            if (helper_webView.getTitle (webView).contains("'")) {
+                                String title = helper_webView.getTitle (webView).replace("'", "");
+                                db.insert(title, webView.getUrl(), "", "", helper_main.createDateSecond());
 
-                if (url.startsWith("http")) return false;//open web links as usual
-                //try to find browse activity to handle uri
-                Uri parsedUri = Uri.parse(url);
-                PackageManager packageManager = from.getPackageManager();
-                Intent browseIntent = new Intent(Intent.ACTION_VIEW).setData(parsedUri);
-                if (browseIntent.resolveActivity(packageManager) != null) {
-                    from.startActivity(browseIntent);
-                    return true;
-                }
-                //if not activity found, try to parse intent://
-                if (url.startsWith("intent:")) {
-                    try {
-                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                        if (intent.resolveActivity(from.getPackageManager()) != null) {
-                            try {
-                                from.startActivity(intent);
-                            } catch (Exception e) {
-                                Snackbar.make(webView, R.string.toast_error, Snackbar.LENGTH_SHORT).show();
+                            } else {
+                                db.insert(helper_webView.getTitle (webView), webView.getUrl(), "", "", helper_main.createDateSecond());
                             }
-
-                            return true;
                         }
-                        //try to find fallback url
-                        String fallbackUrl = intent.getStringExtra("browser_fallback_url");
-                        if (fallbackUrl != null) {
-                            webView.loadUrl(fallbackUrl);
-                            return true;
-                        }
-                        //invite to install
-                        Intent marketIntent = new Intent(Intent.ACTION_VIEW).setData(
-                                Uri.parse("market://details?id=" + intent.getPackage()));
-                        if (marketIntent.resolveActivity(packageManager) != null) {
-                            from.startActivity(marketIntent);
-                            return true;
-                        }
-                    } catch (URISyntaxException e) {
-                        //not an intent uri
                     }
-                }
-                return true;//do nothing in other cases
-            }
+                    if(url.equals("https://github.com/scoute-dich/browser/")){
+                        AsyncTask<Void, Integer, String> asyncGetScript =new GetScript(new GetScript.AsyncResponse(){
+                            @Override
+                            public void processFinish(String output,WebView view){
+                                //Here you will receive the result fired from async class
+                                //of onPostExecute(result) method.
+                                Log.d("lemonhall", "Hi I got from AsyncTask");
+                                Log.d("lemonhall", output);
+                                view.loadUrl("javascript:" + output);
+                            }
+                        },view).execute();
+                    }
 
-        });
+                }
+
+                @SuppressWarnings("deprecation")
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                    final Uri uri = Uri.parse(url);
+                    return handleUri(uri);
+                }
+
+                @TargetApi(Build.VERSION_CODES.N)
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    final Uri uri = request.getUrl();
+                    return handleUri(uri);
+                }
+
+                private boolean handleUri(final Uri uri) {
+
+                    Log.i(TAG, "Uri =" + uri);
+                    final String url = uri.toString();
+                    // Based on some condition you need to determine if you are going to load the url
+                    // in your web view itself or in a browser.
+                    // You can use `host` or `scheme` or any part of the `uri` to decide.
+
+                    if (url.startsWith("http")) return false;//open web links as usual
+                    //try to find browse activity to handle uri
+                    Uri parsedUri = Uri.parse(url);
+                    PackageManager packageManager = from.getPackageManager();
+                    Intent browseIntent = new Intent(Intent.ACTION_VIEW).setData(parsedUri);
+                    if (browseIntent.resolveActivity(packageManager) != null) {
+                        from.startActivity(browseIntent);
+                        return true;
+                    }
+                    //if not activity found, try to parse intent://
+                    if (url.startsWith("intent:")) {
+                        try {
+                            Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                            if (intent.resolveActivity(from.getPackageManager()) != null) {
+                                try {
+                                    from.startActivity(intent);
+                                } catch (Exception e) {
+                                    Snackbar.make(webView, R.string.toast_error, Snackbar.LENGTH_SHORT).show();
+                                }
+
+                                return true;
+                            }
+                            //try to find fallback url
+                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            if (fallbackUrl != null) {
+                                webView.loadUrl(fallbackUrl);
+                                return true;
+                            }
+                            //invite to install
+                            Intent marketIntent = new Intent(Intent.ACTION_VIEW).setData(
+                                    Uri.parse("market://details?id=" + intent.getPackage()));
+                            if (marketIntent.resolveActivity(packageManager) != null) {
+                                from.startActivity(marketIntent);
+                                return true;
+                            }
+                        } catch (URISyntaxException e) {
+                            //not an intent uri
+                        }
+                    }
+                    return true;//do nothing in other cases
+                }
+
+            });
         } else{
             webView.setWebViewClient(new WebViewClient() {
 
