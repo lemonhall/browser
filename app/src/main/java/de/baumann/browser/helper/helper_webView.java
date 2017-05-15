@@ -135,7 +135,7 @@ public class helper_webView {
     public static void webView_Settings(final Activity from, final WebView webView) {
 
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(from);
-        String fontSizeST = sharedPref.getString("font", "100");
+        String fontSizeST = sharedPref.getString("font", "500");
         int fontSize = Integer.parseInt(fontSizeST);
 
         webView.getSettings().setAppCachePath(from.getApplicationContext().getCacheDir().getAbsolutePath());
@@ -150,6 +150,7 @@ public class helper_webView {
         webView.getSettings().setLayoutAlgorithm(WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING);
         webView.getSettings().setUseWideViewPort(true);
         webView.getSettings().setLoadWithOverviewMode(true);
+        //webView.setInitialScale(20);
 
         from.registerForContextMenu(webView);
 
@@ -222,17 +223,11 @@ public class helper_webView {
         if (sharedPref.getString("blockads_string", "").equals(from.getString(R.string.app_yes))) {
             webView.setWebViewClient(new Utils_AdClient() {
 
-                private void processValue(WebView view,String file_content)
-                {
-                    //handle value
-                    //Update GUI, show toast, etc..
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("alert('"+file_content+"')");
-                    view.loadUrl("javascript:" + sb.toString());
-                }
-
                 public void onPageFinished(WebView view, String url) {
+
                     SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(from);
+                    view.setInitialScale(300);
+
                     super.onPageFinished(view, url);
                     swipeRefreshLayout.setRefreshing(false);
                     urlBar.setText(webView.getTitle());
@@ -256,7 +251,7 @@ public class helper_webView {
                             }
                         }
                     }
-                    if(url.equals("https://github.com/scoute-dich/browser/")){
+                    if(url.equals("https://www.douban.com/")){
                         AsyncTask<Void, Integer, String> asyncGetScript =new GetScript(new GetScript.AsyncResponse(){
                             @Override
                             public void processFinish(String output,WebView view){

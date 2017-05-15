@@ -60,7 +60,7 @@
             android:icon="@drawable/desktop_mac"
             android:summary="@string/action_desktop_summary"
             android:key="request_bo"
-            android:defaultValue="false" />
+            android:defaultValue="true" />
 
     </PreferenceCategory>
 
@@ -146,7 +146,7 @@
             android:icon="@drawable/format_size"
             android:summary="@string/action_font_summary"
             android:key="font"
-            android:defaultValue="100"
+            android:defaultValue="500"
             android:entries="@array/listArrayFont"
             android:entryValues="@array/listValuesFont" />
 

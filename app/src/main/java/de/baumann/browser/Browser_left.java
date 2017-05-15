@@ -160,7 +160,7 @@ public class Browser_left extends AppCompatActivity implements ObservableScrollV
             helper_main.switchToActivity(Browser_left.this, Activity_intro.class, "", false);
         }
 
-        sharedPref.edit().putString("openURL", sharedPref.getString("startURL", "https://github.com/scoute-dich/browser/")).apply();
+        sharedPref.edit().putString("openURL", sharedPref.getString("startURL", "https://www.douban.com/")).apply();
         sharedPref.edit().putInt("keyboard", 0).apply();
         sharedPref.getInt("keyboard", 0);
 
